@@ -1,0 +1,4 @@
+requests
+Flask
+pycryptodome
+python-dotenv
