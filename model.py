@@ -9,7 +9,10 @@ db_wrapper = FlaskDB()
 
 
 class Task(db_wrapper.Model):
-    user = CharField(default="", max_length=64)
+    user = CharField(default="", max_length=64, index=True)
+    chat_id = CharField(default="", max_length=100, index=True)
+    message_id = CharField(default="", max_length=100, index=True)
+    chat_type = CharField(default="group", max_length=20, index=True)
     params = TextField(default="{}")
     status = CharField(default="init", index=True, max_length=20)  # init running finish error timeout cancel
     result = TextField(default="")

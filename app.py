@@ -3,7 +3,6 @@
 import json
 import os
 
-
 import requests
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -23,9 +22,7 @@ app = create_app()
 # management, we list them this way:
 FLASKDB_EXCLUDED_ROUTES = ('logout',)
 
-
 peewee_db = db_wrapper.database
-
 
 APP_ID = os.getenv("FEISHU_APP_ID")
 APP_SECRET = os.getenv("FEISHU_APP_SECRET")
@@ -34,12 +31,12 @@ ENCRYPT_KEY = os.getenv("FEISHU_ENCRYPT_KEY")
 MAX_THREAD_NUM = int(os.getenv("MAX_THREAD_NUM", 5))
 feishu_api = FeiShuAPI(APP_ID, APP_SECRET)
 
-
 peewee_db.connect()
 peewee_db.create_tables([Task])
 peewee_db.close()
 
 event_manager = EventManager()
+
 
 @event_manager.register("url_verification")
 def request_url_verify_handler(req_data: UrlVerificationEvent):
@@ -61,13 +58,14 @@ def message_receive_event_handler(req_data: MessageReceiveEvent):
     LOGGER.info("openid %s", open_id)
     LOGGER.info("message %s", req_data)
     text_content = json.loads(message.content)["text"]
-    if "@" in text_content:
+    if text_content.startswith("@"):
         text_content = text_content.split(" ", 1)[-1]
     Task.create(user=open_id, params=json.dumps({"prompt": text_content}), status="init",
-                task_type="imagine")
+                task_type="imagine", chat_type=message.chat_type,
+                chat_id=message.chat_id, message_id=message.message_id)
     access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]
     feishu_api.set_access_token(access_token)
-    feishu_api.send_message(open_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
+    feishu_api.reply_message(message.message_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
     return jsonify()
 
 
@@ -108,20 +106,24 @@ def card_message():
 
         if action:
             open_id = request.json["open_id"]
+            open_message_id = request.json["open_message_id"]
+            open_chat_id = request.json["open_chat_id"]
             action_value = action.get("value", {})
             task_action = action_value.get("action", "")
             # "upscale", "variation"
             if task_action and task_action.startswith("u"):
                 Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                            task_type="upscale")
+                            task_type="upscale", chat_id=open_chat_id, chat_type="",
+                            message_id=open_message_id)
             elif task_action and task_action.startswith("v"):
                 Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                            task_type="variation")
+                            task_type="variation", chat_id=open_chat_id, chat_type="",
+                            message_id=open_message_id)
             else:
                 return "BAD REQUEST", 400
             access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]
             feishu_api.set_access_token(access_token)
-            feishu_api.send_message(open_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
+            feishu_api.reply_message(open_message_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
         return jsonify({"challenge": request.json.get("challenge", "")})
     except:
         LOGGER.error("card_message error", exc_info=True)

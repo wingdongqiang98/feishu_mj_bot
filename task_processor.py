@@ -1,4 +1,5 @@
 # coding:utf-8
+import datetime
 import json
 import os
 import threading
@@ -34,7 +35,7 @@ def send_text_msg(msg, user):
     feishu_api.send_message(user, json.dumps({"text": msg}), msg_type="text")
 
 
-def process_task(task_params, task_type, task_id, user_id):
+def process_task(task_params, task_type, task_id, user_id, char_type, char_id, message_id):
     try:
         init_env(filename="feishu_mj_bot_thread.log")
         Task.update(status="schedule").where(Task.id == task_id).execute()
@@ -64,10 +65,10 @@ def process_task(task_params, task_type, task_id, user_id):
                 image_io = download_image_io(image_url)
                 image_key = feishu_api.upload_image(image_io, os.path.basename(image_url))["data"]["image_key"]
                 if task_type in ["upscale", "variation"]:
-                    feishu_api.send_message(user_id, "{\"image_key\": \"%s\"}" % image_key)
+                    feishu_api.send_message(char_id, "{\"image_key\": \"%s\"}" % image_key, receive_id_type="chat_id")
                 else:
                     msg = CARD_MSG_TEMPLATE.replace("${img_key}", image_key).replace("${task_id}", mj_task_id)
-                    feishu_api.send_message(user_id, msg, msg_type="interactive")
+                    feishu_api.send_message(char_id, msg, msg_type="interactive", receive_id_type="chat_id")
                 break
             if result["data"]["status"] == "error":
                 msg = result.get("msg", "")
@@ -80,17 +81,26 @@ def process_task(task_params, task_type, task_id, user_id):
         send_text_msg(str(e), user_id)
 
 
+@error_cap()
+def delete_old_data():
+    check_time = datetime.datetime.now() - datetime.timedelta(days=7)
+    query = Task.delete().where(Task.timestamp < check_time)
+    query.execute()
+
+
 def process_tasks():
     init_env()
     while True:
         try:
             with app.app_context():
+                delete_old_data()
                 tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
                 for t in tasks:
                     if len(threads) >= MAX_THREAD_NUM:
                         LOGGER.warning("max thread !")
                         continue
-                    th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user))
+                    th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
+                                                                     t.char_id, t.message_id))
                     th.start()
                     threads.append(th)
                 for i in range(len(threads) - 1):
