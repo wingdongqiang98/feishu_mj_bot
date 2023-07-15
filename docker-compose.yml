@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:5.7
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - db_data:/var/lib/mysql
+
+  web:
+    build: .
+    volumes:
+      - .:/code
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+
+volumes:
+  db_data:

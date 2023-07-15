@@ -1,10 +1,11 @@
 # coding:utf-8
 import datetime
+import os
 
 from flask import Flask
 from peewee import CharField, TextField, BooleanField, DateTimeField, IntegerField
 from playhouse.flask_utils import FlaskDB
-DATABASE = 'sqlite:///my_app.db'
+DATABASE = f'mysql://{os.getenv("MYSQL_USER")}:{os.getenv("MYSQL_PASSWORD")}@db/{os.getenv("MYSQL_DATABASE")}'
 db_wrapper = FlaskDB()
 
 

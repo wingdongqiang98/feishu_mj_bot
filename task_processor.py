@@ -8,7 +8,7 @@ from multiprocessing import Process
 
 from dotenv import load_dotenv
 
-from model import Task, create_app
+from model import Task, create_app, db_wrapper
 from utils.feishu_api import FeiShuAPI
 from utils.log_utils import init_env
 from utils.media_utils import download_image_io
@@ -79,6 +79,7 @@ def process_task(task_params, task_type, task_id, user_id, char_type, char_id, m
     except Exception as e:
         Task.update(status="error", desc=str(e)).where(Task.id == task_id).execute()
         send_text_msg(str(e), user_id)
+        LOGGER.error("run error", exc_info=True)
 
 
 @error_cap()
@@ -90,9 +91,14 @@ def delete_old_data():
 
 def process_tasks():
     init_env()
-    while True:
-        try:
-            with app.app_context():
+    with app.app_context():
+        time.sleep(10)
+        peewee_db = db_wrapper.database
+        peewee_db.connect()
+        peewee_db.create_tables([Task])
+        peewee_db.close()
+        while True:
+            try:
                 delete_old_data()
                 tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
                 for t in tasks:
@@ -107,9 +113,9 @@ def process_tasks():
                     t = threads[i]
                     if not t.is_alive():
                         threads.pop(i)
-            time.sleep(3)
-        except:
-            LOGGER.error("run error", exc_info=True)
+                time.sleep(3)
+            except:
+                LOGGER.error("run error", exc_info=True)
 
 
 def main():
