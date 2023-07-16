@@ -31,10 +31,6 @@ ENCRYPT_KEY = os.getenv("FEISHU_ENCRYPT_KEY")
 MAX_THREAD_NUM = int(os.getenv("MAX_THREAD_NUM", 5))
 feishu_api = FeiShuAPI(APP_ID, APP_SECRET)
 
-peewee_db.connect()
-peewee_db.create_tables([Task])
-peewee_db.close()
-
 event_manager = EventManager()
 
 
@@ -60,9 +56,10 @@ def message_receive_event_handler(req_data: MessageReceiveEvent):
     text_content = json.loads(message.content)["text"]
     if text_content.startswith("@"):
         text_content = text_content.split(" ", 1)[-1]
-    Task.create(user=open_id, params=json.dumps({"prompt": text_content}), status="init",
-                task_type="imagine", chat_type=message.chat_type,
-                chat_id=message.chat_id, message_id=message.message_id)
+    with db_wrapper.database.atomic():
+        Task.create(user=open_id, params=json.dumps({"prompt": text_content}), status="init",
+                    task_type="imagine", chat_type=message.chat_type,
+                    chat_id=message.chat_id, message_id=message.message_id)
     access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]
     feishu_api.set_access_token(access_token)
     feishu_api.reply_message(message.message_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
@@ -89,8 +86,9 @@ def callback_event_handler():
 @app.route("/create_task", methods=["POST"])
 def create_task():
     t = request.json["text"]
-    Task.create(user="ou_903c5bc25e57543d52c6869634fa681c", params=json.dumps({"prompt": t}), status="init",
-                task_type="imagine")
+    with db_wrapper.database.atomic():
+        Task.create(user="ou_903c5bc25e57543d52c6869634fa681c", params=json.dumps({"prompt": t}), status="init",
+                    task_type="imagine")
     return jsonify({})
 
 
@@ -112,13 +110,15 @@ def card_message():
             task_action = action_value.get("action", "")
             # "upscale", "variation"
             if task_action and task_action.startswith("u"):
-                Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                            task_type="upscale", chat_id=open_chat_id, chat_type="",
-                            message_id=open_message_id)
+                with db_wrapper.database.atomic():
+                    Task.create(user=open_id, params=json.dumps(action_value), status="init",
+                                task_type="upscale", chat_id=open_chat_id, chat_type="",
+                                message_id=open_message_id)
             elif task_action and task_action.startswith("v"):
-                Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                            task_type="variation", chat_id=open_chat_id, chat_type="",
-                            message_id=open_message_id)
+                with db_wrapper.database.atomic():
+                    Task.create(user=open_id, params=json.dumps(action_value), status="init",
+                                task_type="variation", chat_id=open_chat_id, chat_type="",
+                                message_id=open_message_id)
             else:
                 return "BAD REQUEST", 400
             access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]

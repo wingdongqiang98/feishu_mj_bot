@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN apt-get update && apt-get install -y supervisor
 
 # Copy Supervisor configuration file
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY files/feishu_bot_supervisor.conf /etc/supervisor/conf.d/feishu_bot_supervisor.conf
 
 # Expose port 8000 for Gunicorn
 EXPOSE 8000

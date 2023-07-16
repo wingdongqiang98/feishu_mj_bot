@@ -93,22 +93,20 @@ def process_tasks():
     init_env()
     with app.app_context():
         time.sleep(10)
-        peewee_db = db_wrapper.database
-        peewee_db.connect()
-        peewee_db.create_tables([Task])
-        peewee_db.close()
         while True:
             try:
-                delete_old_data()
-                tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
-                for t in tasks:
-                    if len(threads) >= MAX_THREAD_NUM:
-                        LOGGER.warning("max thread !")
-                        continue
-                    th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
-                                                                     t.char_id, t.message_id))
-                    th.start()
-                    threads.append(th)
+
+                with db_wrapper.database.atomic():
+                    delete_old_data()
+                    tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
+                    for t in tasks:
+                        if len(threads) >= MAX_THREAD_NUM:
+                            LOGGER.warning("max thread !")
+                            continue
+                        th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
+                                                                         t.char_id, t.message_id))
+                        th.start()
+                        threads.append(th)
                 for i in range(len(threads) - 1):
                     t = threads[i]
                     if not t.is_alive():

@@ -30,6 +30,8 @@ def create_app():
     app = Flask(__name__)
     app.config['DATABASE'] = DATABASE
     db_wrapper.init_app(app)
+    with db_wrapper.database.atomic():
+        db_wrapper.database.create_tables([Task])
     return app
 
 
