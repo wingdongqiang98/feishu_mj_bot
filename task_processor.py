@@ -67,10 +67,16 @@ def process_task(task_params, task_type, task_id, user_id, chat_type, chat_id, m
                 image_io = download_image_io(image_url)
                 image_key = feishu_api.upload_image(image_io, os.path.basename(image_url))["data"]["image_key"]
                 if task_type in ["upscale", "variation"]:
-                    feishu_api.send_message(chat_id, "{\"image_key\": \"%s\"}" % image_key, receive_id_type="chat_id")
+                    if chat_type == "group":
+                       feishu_api.reply_message(message_id, "{\"image_key\": \"%s\"}" % image_key) 
+                    else:
+                        feishu_api.send_message(chat_id, "{\"image_key\": \"%s\"}" % image_key, receive_id_type="chat_id")
                 else:
                     msg = CARD_MSG_TEMPLATE.replace("${img_key}", image_key).replace("${task_id}", mj_task_id)
-                    feishu_api.send_message(chat_id, msg, msg_type="interactive", receive_id_type="chat_id")
+                    if chat_type == "group":
+                        feishu_api.reply_message(message_id, msg, msg_type="interactive") 
+                    else:
+                        feishu_api.send_message(chat_id, msg, msg_type="interactive")
                 break
             if result["data"]["status"] == "error":
                 msg = result.get("msg", "")
