@@ -2,14 +2,17 @@
 import datetime
 import os
 
-from flask import Flask
-from peewee import CharField, TextField, BooleanField, DateTimeField, IntegerField
-from playhouse.flask_utils import FlaskDB
+from peewee import CharField, TextField, BooleanField, DateTimeField, IntegerField, Model
+from playhouse.db_url import connect
 DATABASE = f'mysql://{os.getenv("MYSQL_USER")}:{os.getenv("MYSQL_PASSWORD")}@db/{os.getenv("MYSQL_DATABASE")}'
-db_wrapper = FlaskDB()
+database = connect(DATABASE)
 
 
-class Task(db_wrapper.Model):
+class BaseModel(Model):
+    class Meta:
+        database = database
+
+class Task(BaseModel):
     user = CharField(default="", max_length=64, index=True)
     chat_id = CharField(default="", max_length=100, index=True)
     message_id = CharField(default="", max_length=100, index=True)
@@ -25,15 +28,9 @@ class Task(db_wrapper.Model):
     image_url = TextField(default="")
 
 
-def create_app():
-    print("init")
-    app = Flask(__name__)
-    app.config['DATABASE'] = DATABASE
-    db_wrapper.init_app(app)
-    with db_wrapper.database.atomic():
-        db_wrapper.database.create_tables([Task])
-    return app
-
+def initialize_db():
+    database.connect()
+    database.create_tables([Task])
 
 def main():
     pass

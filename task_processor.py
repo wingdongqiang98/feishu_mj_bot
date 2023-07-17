@@ -7,8 +7,8 @@ import time
 from multiprocessing import Process
 
 from dotenv import load_dotenv
+load_dotenv()
 
-from model import Task, create_app, db_wrapper
 from utils.feishu_api import FeiShuAPI
 from utils.log_utils import init_env
 from utils.media_utils import download_image_io
@@ -16,8 +16,7 @@ from utils.task_api import MJApi
 from utils.variables import LOGGER, CARD_MSG_TEMPLATE
 from utils.func_utils import error_cap
 threads = []
-load_dotenv()
-app = create_app()
+
 
 APP_ID = os.getenv("FEISHU_APP_ID")
 APP_SECRET = os.getenv("FEISHU_APP_SECRET")
@@ -25,6 +24,9 @@ VERIFICATION_TOKEN = os.getenv("FEISHU_VERIFICATION_TOKEN")
 ENCRYPT_KEY = os.getenv("FEISHU_ENCRYPT_KEY")
 MAX_THREAD_NUM = int(os.getenv("MAX_THREAD_NUM", 5))
 feishu_api = FeiShuAPI(APP_ID, APP_SECRET)
+from model import Task, initialize_db
+initialize_db()
+
 
 @error_cap()
 def send_text_msg(msg, user):
@@ -91,29 +93,26 @@ def delete_old_data():
 
 def process_tasks():
     init_env()
-    with app.app_context():
-        time.sleep(10)
-        while True:
-            try:
-
-                with db_wrapper.database.atomic():
-                    delete_old_data()
-                    tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
-                    for t in tasks:
-                        if len(threads) >= MAX_THREAD_NUM:
-                            LOGGER.warning("max thread !")
-                            continue
-                        th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
-                                                                         t.char_id, t.message_id))
-                        th.start()
-                        threads.append(th)
-                for i in range(len(threads) - 1):
-                    t = threads[i]
-                    if not t.is_alive():
-                        threads.pop(i)
-                time.sleep(3)
-            except:
-                LOGGER.error("run error", exc_info=True)
+    time.sleep(10)
+    while True:
+        try:
+            delete_old_data()
+            tasks = Task.select().where(Task.status == "init", Task.retry_count <= 3)
+            for t in tasks:
+                if len(threads) >= MAX_THREAD_NUM:
+                    LOGGER.warning("max thread !")
+                    continue
+                th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
+                                                                    t.char_id, t.message_id))
+                th.start()
+                threads.append(th)
+            for i in range(len(threads) - 1):
+                t = threads[i]
+                if not t.is_alive():
+                    threads.pop(i)
+            time.sleep(3)
+        except:
+            LOGGER.error("run error", exc_info=True)
 
 
 def main():

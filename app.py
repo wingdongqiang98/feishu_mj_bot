@@ -6,23 +6,29 @@ import os
 import requests
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-
+load_dotenv()
 from utils.event_utils import EventManager, UrlVerificationEvent, MessageReceiveEvent
 from utils.log_utils import init_env
 
 from utils.variables import LOGGER
 from utils.feishu_api import FeiShuAPI
-from model import db_wrapper, Task, DATABASE, create_app
 
-load_dotenv()
-init_env()
-app = create_app()
+from model import Task, initialize_db
+
+app = Flask(__name__)
+
+@app.before_request
+def before_request():
+    initialize_db()
+
+@app.after_request
+def after_request(response):
+    Task._meta.database.close()
+    return response
 
 # If we want to exclude particular views from the automatic connection
 # management, we list them this way:
 FLASKDB_EXCLUDED_ROUTES = ('logout',)
-
-peewee_db = db_wrapper.database
 
 APP_ID = os.getenv("FEISHU_APP_ID")
 APP_SECRET = os.getenv("FEISHU_APP_SECRET")
@@ -56,10 +62,9 @@ def message_receive_event_handler(req_data: MessageReceiveEvent):
     text_content = json.loads(message.content)["text"]
     if text_content.startswith("@"):
         text_content = text_content.split(" ", 1)[-1]
-    with db_wrapper.database.atomic():
-        Task.create(user=open_id, params=json.dumps({"prompt": text_content}), status="init",
-                    task_type="imagine", chat_type=message.chat_type,
-                    chat_id=message.chat_id, message_id=message.message_id)
+    Task.create(user=open_id, params=json.dumps({"prompt": text_content}), status="init",
+                task_type="imagine", chat_type=message.chat_type,
+                chat_id=message.chat_id, message_id=message.message_id)
     access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]
     feishu_api.set_access_token(access_token)
     feishu_api.reply_message(message.message_id, json.dumps({"text": "图片生成中请稍后。。。"}), msg_type="text")
@@ -86,9 +91,8 @@ def callback_event_handler():
 @app.route("/create_task", methods=["POST"])
 def create_task():
     t = request.json["text"]
-    with db_wrapper.database.atomic():
-        Task.create(user="ou_903c5bc25e57543d52c6869634fa681c", params=json.dumps({"prompt": t}), status="init",
-                    task_type="imagine")
+    Task.create(user="ou_903c5bc25e57543d52c6869634fa681c", params=json.dumps({"prompt": t}), status="init",
+                task_type="imagine")
     return jsonify({})
 
 
@@ -110,15 +114,13 @@ def card_message():
             task_action = action_value.get("action", "")
             # "upscale", "variation"
             if task_action and task_action.startswith("u"):
-                with db_wrapper.database.atomic():
-                    Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                                task_type="upscale", chat_id=open_chat_id, chat_type="",
-                                message_id=open_message_id)
+                Task.create(user=open_id, params=json.dumps(action_value), status="init",
+                            task_type="upscale", chat_id=open_chat_id, chat_type="",
+                            message_id=open_message_id)
             elif task_action and task_action.startswith("v"):
-                with db_wrapper.database.atomic():
-                    Task.create(user=open_id, params=json.dumps(action_value), status="init",
-                                task_type="variation", chat_id=open_chat_id, chat_type="",
-                                message_id=open_message_id)
+                Task.create(user=open_id, params=json.dumps(action_value), status="init",
+                            task_type="variation", chat_id=open_chat_id, chat_type="",
+                            message_id=open_message_id)
             else:
                 return "BAD REQUEST", 400
             access_token = feishu_api.get_tenant_access_token()["tenant_access_token"]
