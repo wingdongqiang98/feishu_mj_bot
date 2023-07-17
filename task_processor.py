@@ -37,7 +37,7 @@ def send_text_msg(msg, user):
     feishu_api.send_message(user, json.dumps({"text": msg}), msg_type="text")
 
 
-def process_task(task_params, task_type, task_id, user_id, chat_type, char_id, message_id):
+def process_task(task_params, task_type, task_id, user_id, chat_type, chat_id, message_id):
     try:
         init_env(filename="feishu_mj_bot_thread.log")
         Task.update(status="schedule").where(Task.id == task_id).execute()
@@ -67,10 +67,10 @@ def process_task(task_params, task_type, task_id, user_id, chat_type, char_id, m
                 image_io = download_image_io(image_url)
                 image_key = feishu_api.upload_image(image_io, os.path.basename(image_url))["data"]["image_key"]
                 if task_type in ["upscale", "variation"]:
-                    feishu_api.send_message(char_id, "{\"image_key\": \"%s\"}" % image_key, receive_id_type="chat_id")
+                    feishu_api.send_message(chat_id, "{\"image_key\": \"%s\"}" % image_key, receive_id_type="chat_id")
                 else:
                     msg = CARD_MSG_TEMPLATE.replace("${img_key}", image_key).replace("${task_id}", mj_task_id)
-                    feishu_api.send_message(char_id, msg, msg_type="interactive", receive_id_type="chat_id")
+                    feishu_api.send_message(chat_id, msg, msg_type="interactive", receive_id_type="chat_id")
                 break
             if result["data"]["status"] == "error":
                 msg = result.get("msg", "")
@@ -103,7 +103,7 @@ def process_tasks():
                     LOGGER.warning("max thread !")
                     continue
                 th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.chat_type,
-                                                                    t.char_id, t.message_id))
+                                                                    t.chat_id, t.message_id))
                 th.start()
                 threads.append(th)
             for i in range(len(threads) - 1):
