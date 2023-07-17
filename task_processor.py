@@ -37,7 +37,7 @@ def send_text_msg(msg, user):
     feishu_api.send_message(user, json.dumps({"text": msg}), msg_type="text")
 
 
-def process_task(task_params, task_type, task_id, user_id, char_type, char_id, message_id):
+def process_task(task_params, task_type, task_id, user_id, chat_type, char_id, message_id):
     try:
         init_env(filename="feishu_mj_bot_thread.log")
         Task.update(status="schedule").where(Task.id == task_id).execute()
@@ -102,7 +102,7 @@ def process_tasks():
                 if len(threads) >= MAX_THREAD_NUM:
                     LOGGER.warning("max thread !")
                     continue
-                th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.char_type,
+                th = threading.Thread(target=process_task, args=(t.params, t.task_type, t.id, t.user, t.chat_type,
                                                                     t.char_id, t.message_id))
                 th.start()
                 threads.append(th)
