@@ -4,4 +4,4 @@ pycryptodome
 python-dotenv
 peewee
 gunicorn
-pymysqldocker
+pymysql
