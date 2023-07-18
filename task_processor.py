@@ -76,7 +76,7 @@ def process_task(task_params, task_type, task_id, user_id, chat_type, chat_id, m
                     if chat_type == "group":
                         feishu_api.reply_message(message_id, msg, msg_type="interactive") 
                     else:
-                        feishu_api.send_message(chat_id, msg, msg_type="interactive")
+                        feishu_api.send_message(chat_id, msg, msg_type="interactive", receive_id_type="chat_id")
                 break
             if result["data"]["status"] == "error":
                 msg = result.get("msg", "")
