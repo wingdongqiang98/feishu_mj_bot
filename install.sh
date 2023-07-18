@@ -9,5 +9,8 @@ sudo apt install -y docker-ce
 sudo systemctl status docker
 
 sudo apt-get install -y nginx
-sudo systemctl enable nginx
 sudo apt-get install -y docker-compose
+
+
+sudo systemctl enable nginx
+sudo systemctl enable docker
