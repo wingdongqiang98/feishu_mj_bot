@@ -11,6 +11,7 @@ services:
 
   web:
     build: .
+    restart: always
     volumes:
       - .:/app
     env_file:
